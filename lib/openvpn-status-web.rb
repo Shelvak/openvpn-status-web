@@ -1,14 +1,22 @@
 #!/usr/bin/env ruby
 
 require 'date'
-require 'etc'
-require 'logger'
-require 'ipaddr'
-require 'yaml'
-require 'rack'
 require 'erb'
+require 'etc'
+require 'ipaddr'
+require 'logger'
 require 'metriks'
-require 'better_errors' if ENV['RACK_ENV'] == "development"
+require 'ostruct'
+require 'rack'
+require 'yaml'
+
+if ENV['RACK_ENV'] == 'development'
+  require 'better_errors'
+  require 'byebug'
+end
+
+# Date helpers
+require 'action_view'
 
 require 'openvpn-status-web/status'
 require 'openvpn-status-web/parser/v1'
@@ -33,6 +41,8 @@ module OpenVPNStatusWeb
   end
 
   class Daemon
+    include ActionView::Helpers::DateHelper
+
     def initialize(vpns)
       @vpns = vpns
 
@@ -40,27 +50,26 @@ module OpenVPNStatusWeb
     end
 
     def call(env)
-      return [405, {"Content-Type" => "text/plain"}, ["Method Not Allowed"]] if env["REQUEST_METHOD"] != "GET"
-      return [404, {"Content-Type" => "text/plain"}, ["Not Found"]] if env["PATH_INFO"] != "/"
+      return [405, {'Content-Type' => 'text/plain'}, ['Method Not Allowed']] if env['REQUEST_METHOD'] != 'GET'
+      return [404, {'Content-Type' => 'text/plain'}, ['Not Found']] if env['PATH_INFO'] != '/'
 
       # variables for template
-      vpns = @vpns
-      stati = {}
-      @vpns.each do |name,config|
-        stati[name] = parse_status_log(config)
+      @vpn_status = {}
+      @vpns.each do |name, config|
+        @vpn_status[name] = parse_status_log(config)
       end
       # eval
       html = @main_tmpl.result(binding)
 
-      [200, {"Content-Type" => "text/html"}, [html]]
+      [200, {'Content-Type' => 'text/html'}, [html]]
     end
 
     def read_template(file)
       text = File.open(file, 'rb') do |f| f.read end
-    
+
       ERB.new(text)
     end
-  
+
     def parse_status_log(vpn)
       text = File.open(vpn['status_file'], 'rb') do |f| f.read end
 
@@ -78,17 +87,17 @@ module OpenVPNStatusWeb
 
     def self.run!
       if ARGV.length != 1
-        puts "Usage: openvpn-status-web config_file"
+        puts 'Usage: openvpn-status-web config_file'
         exit 1
       end
 
       config_file = ARGV[0]
 
       if not File.file?(config_file)
-        puts "Config file not found!"
+        puts 'Config file not found!'
         exit 1
       end
-      
+
       puts "openvpn-status-web version #{OpenVPNStatusWeb::VERSION}"
       puts "Using config file #{config_file}"
 
@@ -100,10 +109,10 @@ module OpenVPNStatusWeb
         OpenVPNStatusWeb.logger = Logger.new(STDOUT)
       end
 
-      OpenVPNStatusWeb.logger.progname = "openvpn-status-web"
+      OpenVPNStatusWeb.logger.progname = 'openvpn-status-web'
       OpenVPNStatusWeb.logger.formatter = LogFormatter.new
 
-      OpenVPNStatusWeb.logger.info "Starting..."
+      OpenVPNStatusWeb.logger.info 'Starting...'
 
       # drop privs (first change group than user)
       Process::Sys.setgid(Etc.getgrnam(config['group']).gid) if config['group']
@@ -111,20 +120,20 @@ module OpenVPNStatusWeb
 
       # configure rack
       app = Daemon.new(config['vpns'])
-      if ENV['RACK_ENV'] == "development"
+      if ENV['RACK_ENV'] == 'development'
         app = BetterErrors::Middleware.new(app)
-        BetterErrors.application_root = File.expand_path("..", __FILE__)
+        BetterErrors.application_root = File.expand_path('..', __FILE__)
       end
 
       Signal.trap('INT') do
-        OpenVPNStatusWeb.logger.info "Quitting..."
+        OpenVPNStatusWeb.logger.info 'Quitting...'
         Rack::Handler::WEBrick.shutdown
       end
       Signal.trap('TERM') do
-        OpenVPNStatusWeb.logger.info "Quitting..."
+        OpenVPNStatusWeb.logger.info 'Quitting...'
         Rack::Handler::WEBrick.shutdown
       end
-      
+
       Rack::Handler::WEBrick.run app, :Host => config['host'], :Port => config['port']
     end
   end

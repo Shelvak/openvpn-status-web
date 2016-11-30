@@ -1,111 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="60">
-  <title>OpenVPN Status</title>
-  <style type="text/css">
-table {
-  border-collapse: collapse;
-}
-h1 {
-  font-size: 24px;
-}
-h2 {
-  font-size: 16px;
-  font-weight: normal;
-  margin-top: 20px;
-  margin-bottom: 10px;
-}
-div {
-  margin-left: 15px;
-}
-td {
-  margin: 0px;
-}
-td.first {
-  padding: 0px 6px 0px 0px;
-}
-td.middle {
-  padding: 0px 6px 0px 6px;
-  border-left: 1px solid #ccc;
-  border-right: 1px solid #ccc;
-}
-td.last {
-  padding: 0px 0px 0px 6px;
-}
-thead {
-  font-weight: bold;
-  border-bottom: 1px solid #ccc;
-}
-  </style>
-</head>
-<body>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="refresh" content="60">
+    <title>OpenVPN Status</title>
+    <style type="text/css">
+      table {
+        border-collapse: collapse;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      h2 {
+        font-size: 16px;
+        font-weight: normal;
+        margin-top: 20px;
+        margin-bottom: 10px;
+      }
+      div {
+        margin-left: 15px;
+      }
+      td {
+        margin: 0px;
+      }
+      td.first {
+        padding: 0px 6px 0px 0px;
+      }
+      td.middle {
+        padding: 0px 6px 0px 6px;
+        border-left: 1px solid #ccc;
+        border-right: 1px solid #ccc;
+      }
+      td.last {
+        padding: 0px 0px 0px 6px;
+      }
+      thead {
+        font-weight: bold;
+        border-bottom: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <% @vpn_status.each do |name, status| %>
 
-<% vpns.each do |name,config| %>
-  <% status = stati[name] %>
-  <h1>OpenVPN Status for <%= name %></h1>
+      <h1>OpenVPN Status for <%= name %></h1>
 
-  <h2>Client List</h2>
-  <div>
-  <table>
-    <thead>
-      <td class="first">Common Name</td>
-      <td class="middle">Real Address</td>
-      <td class="middle">Data Received</td>
-      <td class="middle">Data Sent</td>
-      <td class="last">Connected Since</td>
-    </thead>
-    <tbody>
-<% status.client_list.each do |client| %>
-      <tr>
-        <td class="first"><%= client[0] %></td>
-        <td class="middle"><%= client[1] %></td>
-        <td class="middle"><%= client[2].to_i.as_bytes %></td>
-        <td class="middle"><%= client[3].to_i.as_bytes %></td>
-        <td class="last"><%= client[4].strftime('%-d.%-m.%Y %H:%M:%S') %></td>
-      </tr>
-<% end %>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>Routing Table</h2>
-  <div>
-  <table>
-    <thead>
-      <td class="first">Virtual Address</td>
-      <td class="middle">Common Name</td>
-      <td class="middle">Real Address</td>
-      <td class="last">Last Ref</td>
-    </thead>
-    <tbody>
-<% status.routing_table.each do |route| %>
-      <tr>
-        <td class="first"><%= route[0] %></td>
-        <td class="middle"><%= route[1] %></td>
-        <td class="middle"><%= route[2] %></td>
-        <td class="last"><%= route[3].strftime('%-d.%-m.%Y %H:%M:%S') %></td>
-      </tr>
-<% end %>
-    </tbody>
-  </table>
-  </div>
-
-  <h2>Global Stats</h2>
-  <div>
-  <table>
-    <tbody>
-<% status.global_stats.each do |global| %>
-      <tr>
-        <td><%= global[0] %>:</td>
-        <td><%= global[1] %></td>
-      </tr>
-<% end %>
-    </tbody>
-  </table>
-  </div>
-<% end %>
-
-</body>
+      <h2>Client List</h2>
+      <div>
+        <table>
+          <thead>
+            <td class="first">Cert Name</td>
+            <td class="middle">Real Address</td>
+            <td class="middle">Virtual Address</td>
+            <td class="middle">Data</td>
+            <td class="middle">Connected Since</td>
+            <td class="last">Last Reference</td>
+          </thead>
+          <tbody>
+            <% status.client_list.each do |client| %>
+              <tr>
+                <td class="first"><%= client.name %></td>
+                <td class="middle"><%= client.real_address %></td>
+                <td class="middle"><%= client.virtual_address %></td>
+                <td class="middle"><%= [
+                  client.received_bytes.to_i.as_bytes,
+                  client.sent_bytes.to_i.as_bytes
+                ].join('/') %></td>
+              <td class="middle"><%= distance_of_time_in_words_to_now(client.connected_at) %></td>
+              <td class="last">
+                <% route = status.routing_table[client.name] %>
+                <%= distance_of_time_in_words_to_now(route.last_ref_at) %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    <h2>Global Stats</h2>
+    <div>
+      <ul>
+        <% status.global_stats.each do |(key, value)| %>
+          <li><%= [key, value].join(': ') %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+  </body>
 </html>
